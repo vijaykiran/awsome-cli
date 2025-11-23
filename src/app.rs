@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::aws::{AwsClient, S3Service, S3NavigationAction, S3Item, IamService, IamItem};
+use crate::aws::{AwsClient, S3Service, S3NavigationAction, S3Item, IamService, IamItem, DynamoDbItem};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ServiceType {
@@ -84,6 +84,7 @@ pub struct App {
     pub current_path: Option<String>, // For S3 navigation (bucket/prefix)
     pub s3_items: Vec<S3Item>,
     pub iam_items: Vec<IamItem>,
+    pub dynamodb_items: Vec<DynamoDbItem>,
 }
 
 impl App {
@@ -121,6 +122,7 @@ impl App {
             current_path: None,
             s3_items: Vec::new(),
             iam_items: Vec::new(),
+            dynamodb_items: Vec::new(),
         }
     }
 
@@ -204,6 +206,11 @@ impl App {
             ServiceType::IAM => {
                 if index < self.iam_items.len() {
                     return !matches!(self.iam_items[index], IamItem::Header | IamItem::Separator);
+                }
+            }
+            ServiceType::DynamoDB => {
+                if index < self.dynamodb_items.len() {
+                    return !matches!(self.dynamodb_items[index], DynamoDbItem::Header | DynamoDbItem::Separator);
                 }
             }
             _ => {}
@@ -402,6 +409,19 @@ impl App {
                     resource_line.split_whitespace().next().unwrap_or(resource_line).to_string()
                 }
             }
+            ServiceType::DynamoDB => {
+                // Extract table name from DynamoDbItem
+                if self.selected_index < self.dynamodb_items.len() {
+                    if let DynamoDbItem::Table(name) = &self.dynamodb_items[self.selected_index] {
+                        name.clone()
+                    } else {
+                        self.status_message = "Please select a table row".to_string();
+                        return Ok(());
+                    }
+                } else {
+                    resource_line.clone()
+                }
+            }
             _ => resource_line.clone(),
         };
 
@@ -597,14 +617,19 @@ impl App {
                 match client.list_dynamodb_tables().await {
                     Ok(tables) => {
                         self.loading_state = LoadingState::Loaded;
+                        use crate::aws::DynamoDbService;
+                        let (items, dynamodb_items) = DynamoDbService::format_table_list(&tables);
+                        self.items = items;
+                        self.dynamodb_items = dynamodb_items;
+                        
                         if tables.is_empty() {
-                            self.items = vec![format!("No {} found", self.get_active_service().as_str())];
                             self.status_message = format!("No resources found for {}", self.get_active_service().as_str());
+                            self.selected_index = 0;
                         } else {
-                            self.items = tables;
-                            self.status_message = format!("Loaded {} tables", self.items.len());
+                            self.status_message = format!("Loaded {} tables", tables.len());
+                            // Set selection to first item (skip header and separator)
+                            self.selected_index = 2;
                         }
-                        self.selected_index = 0;
                         self.error_message = None;
                         Ok(())
                     }

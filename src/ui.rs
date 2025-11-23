@@ -140,6 +140,13 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
                         false
                     }
                 }
+                crate::app::ServiceType::DynamoDB => {
+                    if i < app.dynamodb_items.len() {
+                        matches!(app.dynamodb_items[i], crate::aws::DynamoDbItem::Header | crate::aws::DynamoDbItem::Separator)
+                    } else {
+                        false
+                    }
+                }
                 _ => false,
             };
 

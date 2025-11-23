@@ -107,7 +107,7 @@ jobs:
           VERSION=${{ needs.create-release.outputs.version }}
           cat > awsome/Formula/awsome.rb << EOF
           class Awsome < Formula
-            desc "AWS Resource Manager TUI"
+            desc "AWSome AWS TUI"
             homepage "https://github.com/${{ github.repository }}"
             version "${VERSION}"
             license "Apache-2.0"

@@ -11,7 +11,7 @@ pub use s3::{S3Service, S3NavigationAction, S3Item};
 pub use ec2::Ec2Service;
 pub use iam::{IamService, IamItem};
 pub use cloudwatch::CloudwatchService;
-pub use dynamodb::DynamoDbService;
+pub use dynamodb::{DynamoDbService, DynamoDbItem};
 
 #[derive(Clone)]
 pub struct AwsClient {
@@ -51,8 +51,8 @@ impl AwsClient {
         self.cloudwatch_service.list_alarms().await
     }
 
-    pub async fn list_dynamodb_tables(&self) -> Result<Vec<String>> {
-        self.dynamodb_service.list_tables().await
+    pub async fn list_dynamodb_tables(&self) -> Result<Vec<(String, String, String, String)>> {
+        self.dynamodb_service.list_tables_with_details().await
     }
 
     pub async fn get_s3_bucket_details(&self, bucket_name: &str) -> Result<Vec<(String, String)>> {
