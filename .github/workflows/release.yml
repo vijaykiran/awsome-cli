@@ -66,9 +66,9 @@ jobs:
       - name: Checkout tap repository
         uses: actions/checkout@v5
         with:
-          repository: vijaykiran/homebrew-taps
+          repository: vijaykiran/homebrew-tap
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
-          path: homebrew-taps
+          path: tap
 
       - name: Download release assets
         run: |
@@ -83,7 +83,7 @@ jobs:
       - name: Update Homebrew formula
         run: |
           VERSION=${{ steps.get_version.outputs.version }}
-          cat > homebrew-taps/awsome/Formula/awsome.rb << EOF
+          cat > tap/Formula/awsome.rb << EOF
           class Awsome < Formula
             desc "AWSome AWS TUI"
             homepage "https://github.com/${{ github.repository }}"
@@ -110,9 +110,9 @@ jobs:
 
       - name: Commit and push formula
         run: |
-          cd homebrew-taps
+          cd tap
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add awsome/Formula/awsome.rb
+          git add Formula/awsome.rb
           git commit -m "Update awsome to v${{ steps.get_version.outputs.version }}"
           git push
