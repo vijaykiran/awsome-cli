@@ -110,9 +110,7 @@ jobs:
 
       - name: Commit and push formula
         run: |
-          echo $PWD
-          echo `ls`
-          cd awsome
+          cd homebrew-taps
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add Formula/awsome.rb
