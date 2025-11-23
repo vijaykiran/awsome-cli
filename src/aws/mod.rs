@@ -58,4 +58,8 @@ impl AwsClient {
     ) -> Result<Vec<(String, String, String)>> {
         self.s3_service.list_objects(bucket, prefix).await
     }
+
+    pub async fn get_s3_object_details(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
+        self.s3_service.get_object_details(bucket, key).await
+    }
 }

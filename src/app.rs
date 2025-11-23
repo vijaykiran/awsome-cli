@@ -304,6 +304,32 @@ impl App {
             }
         };
 
+        // Check if it's an S3 folder or parent dir
+        if matches!(self.get_active_service().service_type, ServiceType::S3) {
+             if self.selected_index < self.s3_items.len() {
+                 match &self.s3_items[self.selected_index] {
+                     S3Item::Folder(name) => {
+                         self.show_detail_popup = true;
+                         self.detail_loading = false;
+                         self.detail_content = vec![
+                             ("Name".to_string(), name.clone()),
+                             ("Type".to_string(), "Folder".to_string()),
+                         ];
+                         self.status_message = format!("Viewing details for folder {}", name);
+                         return Ok(());
+                     },
+                     S3Item::ParentDir => {
+                         self.status_message = "Parent Directory".to_string();
+                         return Ok(());
+                     },
+                     S3Item::Header | S3Item::Separator => {
+                         return Ok(());
+                     },
+                     _ => {}
+                 }
+             }
+        }
+
         let resource_line = &self.items[self.selected_index];
 
         // Extract resource name based on service type
@@ -337,8 +363,31 @@ impl App {
         self.detail_content = vec![("Loading...".to_string(), "".to_string())];
 
         // Fetch details based on service type
+        // Fetch details based on service type
         let result = match self.get_active_service().service_type {
-            ServiceType::S3 => client.get_s3_bucket_details(&resource_name).await,
+            ServiceType::S3 => {
+                if let Some(path) = &self.current_path {
+                     // We are inside a bucket, so resource_name is the full key
+                     // We need to split it into bucket and key
+                     let parts: Vec<&str> = path.splitn(2, '/').collect();
+                     let bucket = parts[0];
+                     // resource_name was constructed as prefix + name in the previous block
+                     // But wait, resource_name is already constructed as "prefix/name" or just "name"
+                     // Let's re-examine how resource_name is constructed.
+                     
+                     // In the previous block:
+                     // let parts: Vec<&str> = path.splitn(2, '/').collect();
+                     // let prefix = if parts.len() > 1 { parts[1] } else { "" };
+                     // format!("{}{}", prefix, name)
+                     
+                     // So resource_name is the key (including prefix).
+                     // We just need the bucket name.
+                     
+                     client.get_s3_object_details(bucket, &resource_name).await
+                } else {
+                    client.get_s3_bucket_details(&resource_name).await
+                }
+            },
             ServiceType::EC2 => {
                 // For now, just show a placeholder
                 Ok(vec![("Instance ID".to_string(), resource_name.clone())])

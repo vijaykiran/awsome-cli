@@ -186,6 +186,40 @@ impl S3Service {
 
         Ok(details)
     }
+
+    pub async fn get_object_details(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
+        let mut details = Vec::new();
+        details.push(("Name".to_string(), key.to_string()));
+
+        match self.client.head_object().bucket(bucket).key(key).send().await {
+            Ok(head) => {
+                if let Some(size) = head.content_length() {
+                     details.push(("Size".to_string(), format_size(size)));
+                }
+                
+                if let Some(last_modified) = head.last_modified() {
+                    details.push(("Last Modified".to_string(), last_modified.to_string()));
+                }
+                
+                if let Some(etag) = head.e_tag() {
+                    details.push(("ETag".to_string(), etag.to_string()));
+                }
+                
+                if let Some(storage_class) = head.storage_class() {
+                    details.push(("Storage Class".to_string(), format!("{:?}", storage_class)));
+                }
+                
+                if let Some(content_type) = head.content_type() {
+                    details.push(("Content Type".to_string(), content_type.to_string()));
+                }
+            }
+            Err(e) => {
+                details.push(("Error".to_string(), format!("Failed to get object details: {}", e)));
+            }
+        }
+        
+        Ok(details)
+    }
     pub async fn list_objects(
         &self,
         bucket: &str,
