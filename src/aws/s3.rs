@@ -397,3 +397,63 @@ impl S3Service {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_format_size() {
+        assert_eq!(format_size(0), "0 B");
+        assert_eq!(format_size(100), "100 B");
+        assert_eq!(format_size(1024), "1.00 KB");
+        assert_eq!(format_size(1536), "1.50 KB");
+        assert_eq!(format_size(1024 * 1024), "1.00 MB");
+        assert_eq!(format_size(1024 * 1024 * 1024), "1.00 GB");
+    }
+
+    #[test]
+    fn test_format_bucket_list() {
+        // Test empty list
+        let (items, s3_items) = S3Service::format_bucket_list(&[]);
+        assert_eq!(items[0], "No S3 Buckets found");
+        assert!(matches!(s3_items[0], S3Item::Header));
+
+        // Test populated list
+        let buckets = vec![
+            ("bucket1".to_string(), "2023-01-01".to_string()),
+            ("bucket2".to_string(), "2023-01-02".to_string()),
+        ];
+        let (items, s3_items) = S3Service::format_bucket_list(&buckets);
+        
+        assert_eq!(items.len(), 4); // Header, Separator, 2 buckets
+        assert!(items[0].contains("Bucket Name"));
+        assert!(items[2].contains("bucket1"));
+        assert!(items[3].contains("bucket2"));
+        
+        assert!(matches!(s3_items[2], S3Item::Bucket(_)));
+        if let S3Item::Bucket(name) = &s3_items[2] {
+            assert_eq!(name, "bucket1");
+        }
+    }
+
+    #[test]
+    fn test_format_object_list() {
+        let objects = vec![
+            ("folder/".to_string(), "DIR".to_string(), "".to_string()),
+            ("file.txt".to_string(), "1.00 KB".to_string(), "2023-01-01".to_string()),
+        ];
+        
+        let (items, s3_items) = S3Service::format_object_list(&objects, "bucket", "");
+        
+        assert_eq!(items.len(), 5); // Header, Separator, ParentDir, Folder, File
+        assert_eq!(items[2], "..");
+        assert!(matches!(s3_items[2], S3Item::ParentDir));
+        
+        assert!(items[3].contains("folder/"));
+        assert!(matches!(s3_items[3], S3Item::Folder(_)));
+        
+        assert!(items[4].contains("file.txt"));
+        assert!(matches!(s3_items[4], S3Item::Object(_)));
+    }
+}

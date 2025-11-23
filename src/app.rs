@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::aws::{AwsClient, S3Service, S3NavigationAction, S3Item};
+use crate::aws::{AwsClient, S3Service, S3NavigationAction, S3Item, IamService, IamItem};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ServiceType {
@@ -7,6 +7,7 @@ pub enum ServiceType {
     S3,
     IAM,
     CloudWatch,
+    DynamoDB,
 }
 
 impl ServiceType {
@@ -16,6 +17,7 @@ impl ServiceType {
             ServiceType::S3 => "S3 Buckets",
             ServiceType::IAM => "IAM Users",
             ServiceType::CloudWatch => "CloudWatch Alarms",
+            ServiceType::DynamoDB => "DynamoDB Tables",
         }
     }
 
@@ -25,6 +27,7 @@ impl ServiceType {
             ServiceType::S3 => "S3",
             ServiceType::IAM => "IAM",
             ServiceType::CloudWatch => "CloudWatch",
+            ServiceType::DynamoDB => "DynamoDB",
         }
     }
 }
@@ -52,7 +55,7 @@ impl ServiceInfo {
     }
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug)]
 pub enum LoadingState {
     Idle,
     Loading,
@@ -80,6 +83,7 @@ pub struct App {
     pub show_quit_confirm: bool,
     pub current_path: Option<String>, // For S3 navigation (bucket/prefix)
     pub s3_items: Vec<S3Item>,
+    pub iam_items: Vec<IamItem>,
 }
 
 impl App {
@@ -94,6 +98,7 @@ impl App {
                 ServiceInfo::new(ServiceType::S3, true),    // S3 is favorite by default
                 ServiceInfo::new(ServiceType::IAM, false),
                 ServiceInfo::new(ServiceType::CloudWatch, false),
+                ServiceInfo::new(ServiceType::DynamoDB, false),
             ],
             active_service: 0,
             selected_index: 0,
@@ -115,6 +120,7 @@ impl App {
             show_quit_confirm: false,
             current_path: None,
             s3_items: Vec::new(),
+            iam_items: Vec::new(),
         }
     }
 
@@ -149,18 +155,60 @@ impl App {
         if self.items.is_empty() {
             return;
         }
-        self.selected_index = (self.selected_index + 1) % self.items.len();
+        
+        let mut new_index = self.selected_index;
+        loop {
+            new_index = (new_index + 1) % self.items.len();
+            if self.is_selectable(new_index) {
+                self.selected_index = new_index;
+                break;
+            }
+            // Prevent infinite loop if nothing is selectable
+            if new_index == self.selected_index {
+                break;
+            }
+        }
     }
 
     pub fn previous_item(&mut self) {
         if self.items.is_empty() {
             return;
         }
-        if self.selected_index > 0 {
-            self.selected_index -= 1;
-        } else {
-            self.selected_index = self.items.len() - 1;
+        
+        let mut new_index = self.selected_index;
+        loop {
+            if new_index > 0 {
+                new_index -= 1;
+            } else {
+                new_index = self.items.len() - 1;
+            }
+            
+            if self.is_selectable(new_index) {
+                self.selected_index = new_index;
+                break;
+            }
+             // Prevent infinite loop
+            if new_index == self.selected_index {
+                break;
+            }
         }
+    }
+
+    fn is_selectable(&self, index: usize) -> bool {
+        match self.get_active_service().service_type {
+            ServiceType::S3 => {
+                if index < self.s3_items.len() {
+                    return !matches!(self.s3_items[index], S3Item::Header | S3Item::Separator);
+                }
+            }
+            ServiceType::IAM => {
+                if index < self.iam_items.len() {
+                    return !matches!(self.iam_items[index], IamItem::Header | IamItem::Separator);
+                }
+            }
+            _ => {}
+        }
+        true
     }
 
     pub async fn select_item(&mut self) -> Result<()> {
@@ -393,10 +441,22 @@ impl App {
                 Ok(vec![("Instance ID".to_string(), resource_name.clone())])
             }
             ServiceType::IAM => {
-                Ok(vec![("User Name".to_string(), resource_name.clone())])
+                // If we have structured items, use them to get the name
+                if self.selected_index < self.iam_items.len() {
+                    if let IamItem::User(name) = &self.iam_items[self.selected_index] {
+                        Ok(vec![("User Name".to_string(), name.clone())])
+                    } else {
+                         Ok(vec![("User Name".to_string(), resource_name.clone())])
+                    }
+                } else {
+                    Ok(vec![("User Name".to_string(), resource_name.clone())])
+                }
             }
             ServiceType::CloudWatch => {
                 Ok(vec![("Alarm Name".to_string(), resource_name.clone())])
+            }
+            ServiceType::DynamoDB => {
+                client.get_dynamodb_table_details(&resource_name).await
             }
         };
 
@@ -465,6 +525,8 @@ impl App {
                             self.items = items;
                             self.s3_items = s3_items;
                             self.status_message = format!("Browsing s3://{}/{}", bucket, prefix);
+                            // Set selection to first item (skip header and separator)
+                            self.selected_index = 2;
                         }
                         Err(e) => self.handle_resource_error(e)?,
                     }
@@ -478,10 +540,12 @@ impl App {
                             self.s3_items = s3_items;
                             if buckets.is_empty() {
                                 self.status_message = format!("No resources found for {}", self.get_active_service().as_str());
+                                self.selected_index = 0;
                             } else {
                                 self.status_message = format!("Loaded {} buckets", buckets.len());
+                                // Set selection to first item (skip header and separator)
+                                self.selected_index = 2;
                             }
-                            self.selected_index = 0;
                             self.error_message = None;
                             Ok(())
                         }
@@ -491,16 +555,20 @@ impl App {
             }
             ServiceType::IAM => {
                 match client.list_iam_users().await {
-                    Ok(resources) => {
+                    Ok(users) => {
                         self.loading_state = LoadingState::Loaded;
-                        if resources.is_empty() {
-                            self.items = vec![format!("No {} found", self.get_active_service().as_str())];
+                        let (items, iam_items) = IamService::format_user_list(&users);
+                        self.items = items;
+                        self.iam_items = iam_items;
+                        
+                        if users.is_empty() {
                             self.status_message = format!("No resources found for {}", self.get_active_service().as_str());
+                            self.selected_index = 0;
                         } else {
-                            self.items = resources;
-                            self.status_message = format!("Loaded {} resources ({})", self.items.len(), self.get_active_service().as_str());
+                            self.status_message = format!("Loaded {} resources ({})", users.len(), self.get_active_service().as_str());
+                            // Set selection to first item (skip header and separator)
+                            self.selected_index = 2;
                         }
-                        self.selected_index = 0;
                         self.error_message = None;
                         Ok(())
                     }
@@ -517,6 +585,24 @@ impl App {
                         } else {
                             self.items = resources;
                             self.status_message = format!("Loaded {} resources ({})", self.items.len(), self.get_active_service().as_str());
+                        }
+                        self.selected_index = 0;
+                        self.error_message = None;
+                        Ok(())
+                    }
+                    Err(e) => self.handle_resource_error(e),
+                }
+            }
+            ServiceType::DynamoDB => {
+                match client.list_dynamodb_tables().await {
+                    Ok(tables) => {
+                        self.loading_state = LoadingState::Loaded;
+                        if tables.is_empty() {
+                            self.items = vec![format!("No {} found", self.get_active_service().as_str())];
+                            self.status_message = format!("No resources found for {}", self.get_active_service().as_str());
+                        } else {
+                            self.items = tables;
+                            self.status_message = format!("Loaded {} tables", self.items.len());
                         }
                         self.selected_index = 0;
                         self.error_message = None;
@@ -563,5 +649,86 @@ impl App {
 
     pub fn hide_quit_confirmation(&mut self) {
         self.show_quit_confirm = false;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_service_type() {
+        assert_eq!(ServiceType::EC2.short_name(), "EC2");
+        assert_eq!(ServiceType::S3.short_name(), "S3");
+        assert_eq!(ServiceType::IAM.short_name(), "IAM");
+        assert_eq!(ServiceType::CloudWatch.short_name(), "CloudWatch");
+        assert_eq!(ServiceType::DynamoDB.short_name(), "DynamoDB");
+
+        assert_eq!(ServiceType::EC2.as_str(), "EC2 Instances");
+    }
+
+    #[test]
+    fn test_app_initialization() {
+        let app = App::new();
+        assert_eq!(app.active_service, 0);
+        assert_eq!(app.selected_index, 0);
+        assert_eq!(app.loading_state, LoadingState::Idle);
+        assert!(app.services[0].favorite); // EC2 is favorite
+    }
+
+    #[test]
+    fn test_navigation() {
+        let mut app = App::new();
+        app.items = vec!["Item 1".to_string(), "Item 2".to_string(), "Item 3".to_string()];
+        
+        // Test next_item
+        app.next_item();
+        assert_eq!(app.selected_index, 1);
+        app.next_item();
+        assert_eq!(app.selected_index, 2);
+        app.next_item();
+        assert_eq!(app.selected_index, 0); // Wrap around
+
+        // Test previous_item
+        app.previous_item();
+        assert_eq!(app.selected_index, 2); // Wrap around
+        app.previous_item();
+        assert_eq!(app.selected_index, 1);
+    }
+
+    #[test]
+    fn test_is_selectable_s3() {
+        let mut app = App::new();
+        // Switch to S3 (index 1)
+        app.active_service = 1; 
+        
+        // Mock S3 items
+        app.s3_items = vec![
+            S3Item::Header,
+            S3Item::Separator,
+            S3Item::Bucket("bucket1".to_string()),
+        ];
+        app.items = vec![
+            "Header".to_string(),
+            "---".to_string(),
+            "bucket1".to_string(),
+        ];
+
+        // Header should not be selectable
+        assert!(!app.is_selectable(0));
+        // Separator should not be selectable
+        assert!(!app.is_selectable(1));
+        // Bucket should be selectable
+        assert!(app.is_selectable(2));
+
+        // Test navigation skipping non-selectable items
+        app.selected_index = 2;
+        app.next_item(); // Should wrap to 2 because 0 and 1 are not selectable
+        assert_eq!(app.selected_index, 2);
+        
+        // If we force selection to 0 (which shouldn't happen normally but for test setup)
+        app.selected_index = 0;
+        app.next_item();
+        assert_eq!(app.selected_index, 2);
     }
 }

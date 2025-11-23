@@ -124,7 +124,28 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
         .iter()
         .enumerate()
         .map(|(i, item)| {
-            let style = if i == app.selected_index {
+            // Check if it's a header/separator for S3 or IAM
+            let is_header_or_sep = match app.get_active_service().service_type {
+                crate::app::ServiceType::S3 => {
+                    if i < app.s3_items.len() {
+                        matches!(app.s3_items[i], crate::aws::S3Item::Header | crate::aws::S3Item::Separator)
+                    } else {
+                        false
+                    }
+                }
+                crate::app::ServiceType::IAM => {
+                    if i < app.iam_items.len() {
+                        matches!(app.iam_items[i], crate::aws::IamItem::Header | crate::aws::IamItem::Separator)
+                    } else {
+                        false
+                    }
+                }
+                _ => false,
+            };
+
+            let style = if is_header_or_sep {
+                 Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)
+            } else if i == app.selected_index {
                 Style::default()
                     .bg(Color::DarkGray)
                     .add_modifier(Modifier::BOLD)

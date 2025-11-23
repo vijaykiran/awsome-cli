@@ -5,11 +5,13 @@ mod s3;
 mod ec2;
 mod iam;
 mod cloudwatch;
+mod dynamodb;
 
 pub use s3::{S3Service, S3NavigationAction, S3Item};
 pub use ec2::Ec2Service;
-pub use iam::IamService;
+pub use iam::{IamService, IamItem};
 pub use cloudwatch::CloudwatchService;
+pub use dynamodb::DynamoDbService;
 
 #[derive(Clone)]
 pub struct AwsClient {
@@ -17,6 +19,7 @@ pub struct AwsClient {
     s3_service: S3Service,
     iam_service: IamService,
     cloudwatch_service: CloudwatchService,
+    dynamodb_service: DynamoDbService,
 }
 
 impl AwsClient {
@@ -28,6 +31,7 @@ impl AwsClient {
             s3_service: S3Service::new(aws_sdk_s3::Client::new(&config)),
             iam_service: IamService::new(aws_sdk_iam::Client::new(&config)),
             cloudwatch_service: CloudwatchService::new(aws_sdk_cloudwatch::Client::new(&config)),
+            dynamodb_service: DynamoDbService::new(aws_sdk_dynamodb::Client::new(&config)),
         })
     }
 
@@ -39,12 +43,16 @@ impl AwsClient {
         self.s3_service.list_buckets().await
     }
 
-    pub async fn list_iam_users(&self) -> Result<Vec<String>> {
+    pub async fn list_iam_users(&self) -> Result<Vec<(String, String, String)>> {
         self.iam_service.list_users().await
     }
 
     pub async fn list_cloudwatch_alarms(&self) -> Result<Vec<String>> {
         self.cloudwatch_service.list_alarms().await
+    }
+
+    pub async fn list_dynamodb_tables(&self) -> Result<Vec<String>> {
+        self.dynamodb_service.list_tables().await
     }
 
     pub async fn get_s3_bucket_details(&self, bucket_name: &str) -> Result<Vec<(String, String)>> {
@@ -61,5 +69,9 @@ impl AwsClient {
 
     pub async fn get_s3_object_details(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
         self.s3_service.get_object_details(bucket, key).await
+    }
+
+    pub async fn get_dynamodb_table_details(&self, table_name: &str) -> Result<Vec<(String, String)>> {
+        self.dynamodb_service.describe_table(table_name).await
     }
 }
