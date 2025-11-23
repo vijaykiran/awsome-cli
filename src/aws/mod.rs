@@ -1,17 +1,20 @@
 use anyhow::Result;
 use aws_config::BehaviorVersion;
 
-mod s3;
-mod ec2;
-mod iam;
 mod cloudwatch;
 mod dynamodb;
+mod ec2;
+mod ecs;
+mod iam;
+mod s3;
+pub mod utils;
 
-pub use s3::{S3Service, S3NavigationAction, S3Item};
-pub use ec2::{Ec2Service, Ec2Item};
-pub use iam::{IamService, IamItem};
 pub use cloudwatch::CloudwatchService;
-pub use dynamodb::{DynamoDbService, DynamoDbItem};
+pub use dynamodb::{DynamoDbItem, DynamoDbService};
+pub use ec2::{Ec2Item, Ec2Service};
+pub use iam::{IamItem, IamService};
+pub use s3::{S3Item, S3NavigationAction, S3Service};
+pub use ecs::{EcsService, EcsItem};
 
 #[derive(Clone)]
 pub struct AwsClient {
@@ -20,6 +23,7 @@ pub struct AwsClient {
     iam_service: IamService,
     cloudwatch_service: CloudwatchService,
     dynamodb_service: DynamoDbService,
+    ecs_service: EcsService,
 }
 
 impl AwsClient {
@@ -32,10 +36,13 @@ impl AwsClient {
             iam_service: IamService::new(aws_sdk_iam::Client::new(&config)),
             cloudwatch_service: CloudwatchService::new(aws_sdk_cloudwatch::Client::new(&config)),
             dynamodb_service: DynamoDbService::new(aws_sdk_dynamodb::Client::new(&config)),
+            ecs_service: EcsService::new(aws_sdk_ecs::Client::new(&config)),
         })
     }
 
-    pub async fn list_ec2_instances(&self) -> Result<Vec<(String, String, String, String, String)>> {
+    pub async fn list_ec2_instances(
+        &self,
+    ) -> Result<Vec<(String, String, String, String, String)>> {
         self.ec2_service.list_instances().await
     }
 
@@ -67,11 +74,26 @@ impl AwsClient {
         self.s3_service.list_objects(bucket, prefix).await
     }
 
-    pub async fn get_s3_object_details(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
+    pub async fn get_s3_object_details(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<Vec<(String, String)>> {
         self.s3_service.get_object_details(bucket, key).await
     }
 
-    pub async fn get_dynamodb_table_details(&self, table_name: &str) -> Result<Vec<(String, String)>> {
+    pub async fn get_dynamodb_table_details(
+        &self,
+        table_name: &str,
+    ) -> Result<Vec<(String, String)>> {
         self.dynamodb_service.describe_table(table_name).await
+    }
+
+    pub async fn list_ecs_clusters(&self) -> Result<Vec<String>> {
+        self.ecs_service.list_clusters().await
+    }
+
+    pub async fn list_ecs_services(&self, cluster: &str) -> Result<Vec<String>> {
+        self.ecs_service.list_services(cluster).await
     }
 }

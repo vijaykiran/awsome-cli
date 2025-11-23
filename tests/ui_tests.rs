@@ -1,7 +1,7 @@
 use awsome::app::App;
 use awsome::ui;
-use ratatui::backend::TestBackend;
 use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 
 #[test]
 fn test_ui_initial_state() {
@@ -14,18 +14,18 @@ fn test_ui_initial_state() {
 
     // Assert on the buffer content
     let buffer = terminal.backend().buffer();
-    
+
     // Check for title
-    // Note: The actual title format depends on ui.rs implementation. 
+    // Note: The actual title format depends on ui.rs implementation.
     // Based on typical TUI apps, we expect some header or content.
     // Let's check for "AWS Resource Manager" if that's the title, or service names.
-    
+
     // We know the app starts with "Initializing AWS client..." in the list
     // and "Press Space for services..." in the status bar.
-    
+
     // Let's check for the presence of these strings in the buffer cells
     let content = buffer_to_string(buffer);
-    
+
     assert!(content.contains("Initializing AWS client..."));
     assert!(content.contains("Press Space for services"));
     assert!(content.contains("EC2 Instances")); // Active service tab

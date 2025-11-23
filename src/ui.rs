@@ -1,9 +1,9 @@
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Clear, List, ListItem, Paragraph},
-    Frame,
 };
 
 use crate::app::{App, LoadingState};
@@ -58,12 +58,20 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
 
     // Left side - services
     let mut left_spans = vec![
-        Span::styled("AWSOME ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "AWSOME ",
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw("| "),
     ];
 
     if favorites.is_empty() {
-        left_spans.push(Span::styled("No favorites - Press Space to select service", Style::default().fg(Color::Gray)));
+        left_spans.push(Span::styled(
+            "No favorites - Press Space to select service",
+            Style::default().fg(Color::Gray),
+        ));
     } else {
         for (idx, (service_idx, service)) in favorites.iter().enumerate() {
             let is_active = *service_idx == app.active_service;
@@ -76,10 +84,7 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
                 Style::default().fg(Color::White)
             };
 
-            left_spans.push(Span::styled(
-                format!(" {} ", service.short_name()),
-                style,
-            ));
+            left_spans.push(Span::styled(format!(" {} ", service.short_name()), style));
 
             if idx < favorites.len() - 1 {
                 left_spans.push(Span::raw("• "));
@@ -87,13 +92,21 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
         }
 
         left_spans.push(Span::raw(" "));
-        left_spans.push(Span::styled("[Space: More]", Style::default().fg(Color::DarkGray)));
+        left_spans.push(Span::styled(
+            "[Space: More]",
+            Style::default().fg(Color::DarkGray),
+        ));
     }
 
     // Right side - profile
     let profile_spans = vec![
         Span::styled("@ ", Style::default().fg(Color::DarkGray)),
-        Span::styled(&app.profile_name, Style::default().fg(Color::Magenta).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            &app.profile_name,
+            Style::default()
+                .fg(Color::Magenta)
+                .add_modifier(Modifier::BOLD),
+        ),
     ];
 
     // Render border
@@ -105,8 +118,7 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
     f.render_widget(left_paragraph, header_chunks[0]);
 
     // Render right content (profile)
-    let right_paragraph = Paragraph::new(Line::from(profile_spans))
-        .alignment(Alignment::Right);
+    let right_paragraph = Paragraph::new(Line::from(profile_spans)).alignment(Alignment::Right);
     f.render_widget(right_paragraph, header_chunks[1]);
 }
 
@@ -128,28 +140,50 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
             let is_header_or_sep = match app.get_active_service().service_type {
                 crate::app::ServiceType::S3 => {
                     if i < app.s3_items.len() {
-                        matches!(app.s3_items[i], crate::aws::S3Item::Header | crate::aws::S3Item::Separator)
+                        matches!(
+                            app.s3_items[i],
+                            crate::aws::S3Item::Header | crate::aws::S3Item::Separator
+                        )
                     } else {
                         false
                     }
                 }
                 crate::app::ServiceType::IAM => {
                     if i < app.iam_items.len() {
-                        matches!(app.iam_items[i], crate::aws::IamItem::Header | crate::aws::IamItem::Separator)
+                        matches!(
+                            app.iam_items[i],
+                            crate::aws::IamItem::Header | crate::aws::IamItem::Separator
+                        )
                     } else {
                         false
                     }
                 }
                 crate::app::ServiceType::DynamoDB => {
                     if i < app.dynamodb_items.len() {
-                        matches!(app.dynamodb_items[i], crate::aws::DynamoDbItem::Header | crate::aws::DynamoDbItem::Separator)
+                        matches!(
+                            app.dynamodb_items[i],
+                            crate::aws::DynamoDbItem::Header | crate::aws::DynamoDbItem::Separator
+                        )
                     } else {
                         false
                     }
                 }
                 crate::app::ServiceType::EC2 => {
                     if i < app.ec2_items.len() {
-                        matches!(app.ec2_items[i], crate::aws::Ec2Item::Header | crate::aws::Ec2Item::Separator)
+                        matches!(
+                            app.ec2_items[i],
+                            crate::aws::Ec2Item::Header | crate::aws::Ec2Item::Separator
+                        )
+                    } else {
+                        false
+                    }
+                }
+                crate::app::ServiceType::ECS => {
+                    if i < app.ecs_items.len() {
+                        matches!(
+                            app.ecs_items[i],
+                            crate::aws::EcsItem::Header | crate::aws::EcsItem::Separator
+                        )
                     } else {
                         false
                     }
@@ -158,7 +192,9 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
             };
 
             let style = if is_header_or_sep {
-                 Style::default().fg(Color::Blue).add_modifier(Modifier::BOLD)
+                Style::default()
+                    .fg(Color::Blue)
+                    .add_modifier(Modifier::BOLD)
             } else if i == app.selected_index {
                 Style::default()
                     .bg(Color::DarkGray)
@@ -193,7 +229,12 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
             Block::default()
                 .borders(Borders::ALL)
                 .border_style(border_style)
-                .title(Span::styled(title, Style::default().fg(title_color).add_modifier(Modifier::BOLD))),
+                .title(Span::styled(
+                    title,
+                    Style::default()
+                        .fg(title_color)
+                        .add_modifier(Modifier::BOLD),
+                )),
         )
         .highlight_style(
             Style::default()
@@ -218,7 +259,9 @@ fn draw_footer(f: &mut Frame, area: Rect, app: &App) {
     if app.is_loading() {
         status_spans.push(Span::styled(
             format!("{} ", app.get_loading_spinner()),
-            Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         ));
     }
 
@@ -293,18 +336,16 @@ fn draw_service_popup(f: &mut Frame, app: &App) {
     f.render_widget(list, chunks[0]);
 
     // Draw help text at bottom
-    let help_text = vec![
-        Line::from(vec![
-            Span::styled("↑/↓/j/k", Style::default().fg(Color::Yellow)),
-            Span::raw(": Navigate  "),
-            Span::styled("Enter", Style::default().fg(Color::Yellow)),
-            Span::raw(": Select  "),
-            Span::styled("f", Style::default().fg(Color::Yellow)),
-            Span::raw(": Toggle ★  "),
-            Span::styled("Esc", Style::default().fg(Color::Yellow)),
-            Span::raw(": Close"),
-        ]),
-    ];
+    let help_text = vec![Line::from(vec![
+        Span::styled("↑/↓/j/k", Style::default().fg(Color::Yellow)),
+        Span::raw(": Navigate  "),
+        Span::styled("Enter", Style::default().fg(Color::Yellow)),
+        Span::raw(": Select  "),
+        Span::styled("f", Style::default().fg(Color::Yellow)),
+        Span::raw(": Toggle ★  "),
+        Span::styled("Esc", Style::default().fg(Color::Yellow)),
+        Span::raw(": Close"),
+    ])];
 
     let help = Paragraph::new(help_text)
         .alignment(Alignment::Center)
@@ -357,12 +398,20 @@ fn draw_detail_popup(f: &mut Frame, app: &App) {
         .iter()
         .map(|(key, value)| {
             let content = if value.is_empty() {
-                Line::from(vec![
-                    Span::styled(key, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                ])
+                Line::from(vec![Span::styled(
+                    key,
+                    Style::default()
+                        .fg(Color::Cyan)
+                        .add_modifier(Modifier::BOLD),
+                )])
             } else {
                 Line::from(vec![
-                    Span::styled(format!("{}: ", key), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                    Span::styled(
+                        format!("{}: ", key),
+                        Style::default()
+                            .fg(Color::Cyan)
+                            .add_modifier(Modifier::BOLD),
+                    ),
                     Span::styled(value, Style::default().fg(Color::White)),
                 ])
             };
@@ -374,16 +423,14 @@ fn draw_detail_popup(f: &mut Frame, app: &App) {
     f.render_widget(list, chunks[0]);
 
     // Draw help text at bottom
-    let help_text = vec![
-        Line::from(vec![
-            Span::styled("↑/↓/j/k", Style::default().fg(Color::Yellow)),
-            Span::raw(": Scroll  "),
-            Span::styled("Esc", Style::default().fg(Color::Yellow)),
-            Span::raw(" or "),
-            Span::styled("i", Style::default().fg(Color::Yellow)),
-            Span::raw(": Close"),
-        ]),
-    ];
+    let help_text = vec![Line::from(vec![
+        Span::styled("↑/↓/j/k", Style::default().fg(Color::Yellow)),
+        Span::raw(": Scroll  "),
+        Span::styled("Esc", Style::default().fg(Color::Yellow)),
+        Span::raw(" or "),
+        Span::styled("i", Style::default().fg(Color::Yellow)),
+        Span::raw(": Close"),
+    ])];
 
     let help = Paragraph::new(help_text)
         .alignment(Alignment::Center)
@@ -434,13 +481,20 @@ fn draw_quit_confirmation(f: &mut Frame) {
 
     // Buttons
     let buttons = Line::from(vec![
-        Span::styled("[Y]", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[Y]",
+            Style::default()
+                .fg(Color::Green)
+                .add_modifier(Modifier::BOLD),
+        ),
         Span::raw("es  "),
-        Span::styled("[N]", Style::default().fg(Color::Red).add_modifier(Modifier::BOLD)),
+        Span::styled(
+            "[N]",
+            Style::default().fg(Color::Red).add_modifier(Modifier::BOLD),
+        ),
         Span::raw("o"),
     ]);
-    let buttons_widget = Paragraph::new(buttons)
-        .alignment(Alignment::Center);
+    let buttons_widget = Paragraph::new(buttons).alignment(Alignment::Center);
     f.render_widget(buttons_widget, chunks[2]);
 }
 

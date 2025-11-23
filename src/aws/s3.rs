@@ -1,3 +1,4 @@
+use crate::aws::utils::format_size;
 use anyhow::Result;
 use aws_sdk_s3::Client as S3Client;
 
@@ -116,10 +117,10 @@ impl S3Service {
                 details.push(("ACL Grants".to_string(), format!("{} grant(s)", grants)));
 
                 // Show owner
-                if let Some(owner) = acl.owner() {
-                    if let Some(display_name) = owner.display_name() {
-                        details.push(("Owner".to_string(), display_name.to_string()));
-                    }
+                if let Some(owner) = acl.owner()
+                    && let Some(display_name) = owner.display_name()
+                {
+                    details.push(("Owner".to_string(), display_name.to_string()));
                 }
             }
             Err(e) => {
@@ -187,37 +188,51 @@ impl S3Service {
         Ok(details)
     }
 
-    pub async fn get_object_details(&self, bucket: &str, key: &str) -> Result<Vec<(String, String)>> {
+    pub async fn get_object_details(
+        &self,
+        bucket: &str,
+        key: &str,
+    ) -> Result<Vec<(String, String)>> {
         let mut details = Vec::new();
         details.push(("Name".to_string(), key.to_string()));
 
-        match self.client.head_object().bucket(bucket).key(key).send().await {
+        match self
+            .client
+            .head_object()
+            .bucket(bucket)
+            .key(key)
+            .send()
+            .await
+        {
             Ok(head) => {
                 if let Some(size) = head.content_length() {
-                     details.push(("Size".to_string(), format_size(size)));
+                    details.push(("Size".to_string(), format_size(size)));
                 }
-                
+
                 if let Some(last_modified) = head.last_modified() {
                     details.push(("Last Modified".to_string(), last_modified.to_string()));
                 }
-                
+
                 if let Some(etag) = head.e_tag() {
                     details.push(("ETag".to_string(), etag.to_string()));
                 }
-                
+
                 if let Some(storage_class) = head.storage_class() {
                     details.push(("Storage Class".to_string(), format!("{:?}", storage_class)));
                 }
-                
+
                 if let Some(content_type) = head.content_type() {
                     details.push(("Content Type".to_string(), content_type.to_string()));
                 }
             }
             Err(e) => {
-                details.push(("Error".to_string(), format!("Failed to get object details: {}", e)));
+                details.push((
+                    "Error".to_string(),
+                    format!("Failed to get object details: {}", e),
+                ));
             }
         }
-        
+
         Ok(details)
     }
     pub async fn list_objects(
@@ -241,14 +256,14 @@ impl S3Service {
             if let Some(folder_prefix) = cp.prefix() {
                 // Remove the parent prefix from the display name
                 // Actually we want the relative name
-                
-                 // If we are in "folder/", and we get "folder/sub/", we want to show "sub/"
-                 
-                 let name = if !prefix.is_empty() && folder_prefix.starts_with(prefix) {
-                     folder_prefix.strip_prefix(prefix).unwrap_or(folder_prefix)
-                 } else {
-                     folder_prefix
-                 };
+
+                // If we are in "folder/", and we get "folder/sub/", we want to show "sub/"
+
+                let name = if !prefix.is_empty() && folder_prefix.starts_with(prefix) {
+                    folder_prefix.strip_prefix(prefix).unwrap_or(folder_prefix)
+                } else {
+                    folder_prefix
+                };
 
                 objects.push((name.to_string(), "DIR".to_string(), "".to_string()));
             }
@@ -264,14 +279,14 @@ impl S3Service {
                 }
 
                 let name = if !prefix.is_empty() && key.starts_with(prefix) {
-                     key.strip_prefix(prefix).unwrap_or(key)
+                    key.strip_prefix(prefix).unwrap_or(key)
                 } else {
-                     key
+                    key
                 };
 
                 let size = object.size().unwrap_or(0);
                 let size_str = format_size(size);
-                
+
                 let date = object
                     .last_modified()
                     .map(|d| d.to_string())
@@ -282,22 +297,6 @@ impl S3Service {
         }
 
         Ok(objects)
-    }
-}
-
-fn format_size(size: i64) -> String {
-    const KB: i64 = 1024;
-    const MB: i64 = KB * 1024;
-    const GB: i64 = MB * 1024;
-
-    if size >= GB {
-        format!("{:.2} GB", size as f64 / GB as f64)
-    } else if size >= MB {
-        format!("{:.2} MB", size as f64 / MB as f64)
-    } else if size >= KB {
-        format!("{:.2} KB", size as f64 / KB as f64)
-    } else {
-        format!("{} B", size)
     }
 }
 
@@ -322,17 +321,25 @@ pub enum S3Item {
 impl S3Service {
     pub fn format_bucket_list(buckets: &[(String, String)]) -> (Vec<String>, Vec<S3Item>) {
         if buckets.is_empty() {
-            return (vec!["No S3 Buckets found".to_string()], vec![S3Item::Header]);
+            return (
+                vec!["No S3 Buckets found".to_string()],
+                vec![S3Item::Header],
+            );
         }
 
-        let max_name_len = buckets.iter()
+        let max_name_len = buckets
+            .iter()
             .map(|(name, _)| name.len())
             .max()
             .unwrap_or(20)
             .max(20);
 
-        let header = format!("{:<width$}  Creation Date", "Bucket Name", width = max_name_len);
-        let separator = format!("{}", "-".repeat(max_name_len + 25));
+        let header = format!(
+            "{:<width$}  Creation Date",
+            "Bucket Name",
+            width = max_name_len
+        );
+        let separator = "-".repeat(max_name_len + 25).to_string();
 
         let mut items = vec![header, separator];
         let mut s3_items = vec![S3Item::Header, S3Item::Separator];
@@ -344,15 +351,25 @@ impl S3Service {
         (items, s3_items)
     }
 
-    pub fn format_object_list(objects: &[(String, String, String)], _bucket: &str, _prefix: &str) -> (Vec<String>, Vec<S3Item>) {
-        let max_name_len = objects.iter()
+    pub fn format_object_list(
+        objects: &[(String, String, String)],
+        _bucket: &str,
+        _prefix: &str,
+    ) -> (Vec<String>, Vec<S3Item>) {
+        let max_name_len = objects
+            .iter()
             .map(|(name, _, _)| name.len())
             .max()
             .unwrap_or(20)
             .max(20);
 
-        let header = format!("{:<width$}  {:<10}  Last Modified", "Name", "Size", width = max_name_len);
-        let separator = format!("{}", "-".repeat(max_name_len + 30));
+        let header = format!(
+            "{:<width$}  {:<10}  Last Modified",
+            "Name",
+            "Size",
+            width = max_name_len
+        );
+        let separator = "-".repeat(max_name_len + 30).to_string();
 
         let mut items = vec![header, separator];
         let mut s3_items = vec![S3Item::Header, S3Item::Separator];
@@ -361,7 +378,13 @@ impl S3Service {
         s3_items.push(S3Item::ParentDir);
 
         for (name, size, date) in objects {
-            items.push(format!("{:<width$}  {:<10}  {}", name, size, date, width = max_name_len));
+            items.push(format!(
+                "{:<width$}  {:<10}  {}",
+                name,
+                size,
+                date,
+                width = max_name_len
+            ));
             if size == "DIR" {
                 s3_items.push(S3Item::Folder(name.clone()));
             } else {
@@ -375,23 +398,23 @@ impl S3Service {
         match item {
             S3Item::Bucket(name) => S3NavigationAction::EnterBucket(format!("{}/", name)),
             S3Item::Folder(name) => {
-                 if let Some(path) = current_path {
-                     S3NavigationAction::EnterFolder(format!("{}{}", path, name))
-                 } else {
-                     S3NavigationAction::None
-                 }
-            },
+                if let Some(path) = current_path {
+                    S3NavigationAction::EnterFolder(format!("{}{}", path, name))
+                } else {
+                    S3NavigationAction::None
+                }
+            }
             S3Item::Object(key) => {
-                 if let Some(path) = current_path {
-                     // Construct full key
-                     let parts: Vec<&str> = path.splitn(2, '/').collect();
-                     let prefix = if parts.len() > 1 { parts[1] } else { "" };
-                     let full_key = format!("{}{}", prefix, key);
-                     S3NavigationAction::ShowDetails(full_key)
-                 } else {
-                     S3NavigationAction::None
-                 }
-            },
+                if let Some(path) = current_path {
+                    // Construct full key
+                    let parts: Vec<&str> = path.splitn(2, '/').collect();
+                    let prefix = if parts.len() > 1 { parts[1] } else { "" };
+                    let full_key = format!("{}{}", prefix, key);
+                    S3NavigationAction::ShowDetails(full_key)
+                } else {
+                    S3NavigationAction::None
+                }
+            }
             S3Item::ParentDir => S3NavigationAction::GoBack,
             _ => S3NavigationAction::None,
         }
@@ -401,6 +424,7 @@ impl S3Service {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::aws::utils::format_size;
 
     #[test]
     fn test_format_size() {
@@ -425,12 +449,12 @@ mod tests {
             ("bucket2".to_string(), "2023-01-02".to_string()),
         ];
         let (items, s3_items) = S3Service::format_bucket_list(&buckets);
-        
+
         assert_eq!(items.len(), 4); // Header, Separator, 2 buckets
         assert!(items[0].contains("Bucket Name"));
         assert!(items[2].contains("bucket1"));
         assert!(items[3].contains("bucket2"));
-        
+
         assert!(matches!(s3_items[2], S3Item::Bucket(_)));
         if let S3Item::Bucket(name) = &s3_items[2] {
             assert_eq!(name, "bucket1");
@@ -441,18 +465,22 @@ mod tests {
     fn test_format_object_list() {
         let objects = vec![
             ("folder/".to_string(), "DIR".to_string(), "".to_string()),
-            ("file.txt".to_string(), "1.00 KB".to_string(), "2023-01-01".to_string()),
+            (
+                "file.txt".to_string(),
+                "1.00 KB".to_string(),
+                "2023-01-01".to_string(),
+            ),
         ];
-        
+
         let (items, s3_items) = S3Service::format_object_list(&objects, "bucket", "");
-        
+
         assert_eq!(items.len(), 5); // Header, Separator, ParentDir, Folder, File
         assert_eq!(items[2], "..");
         assert!(matches!(s3_items[2], S3Item::ParentDir));
-        
+
         assert!(items[3].contains("folder/"));
         assert!(matches!(s3_items[3], S3Item::Folder(_)));
-        
+
         assert!(items[4].contains("file.txt"));
         assert!(matches!(s3_items[4], S3Item::Object(_)));
     }
