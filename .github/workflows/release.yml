@@ -3,7 +3,7 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - "v*"
 
 env:
   CARGO_TERM_COLOR: always
@@ -63,11 +63,11 @@ jobs:
         run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
 
       - name: Checkout tap repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: vijaykiran/homebrew-taps
           token: ${{ secrets.TAP_GITHUB_TOKEN }}
-          path: awsome
+          path: homebrew-taps
 
       - name: Download release assets
         run: |
@@ -82,7 +82,7 @@ jobs:
       - name: Update Homebrew formula
         run: |
           VERSION=${{ steps.get_version.outputs.version }}
-          cat > awsome/Formula/awsome.rb << EOF
+          cat > homebrew-taps/awsome/Formula/awsome.rb << EOF
           class Awsome < Formula
             desc "AWSome AWS TUI"
             homepage "https://github.com/${{ github.repository }}"
@@ -109,6 +109,8 @@ jobs:
 
       - name: Commit and push formula
         run: |
+          echo $PWD
+          echo `ls`
           cd awsome
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
