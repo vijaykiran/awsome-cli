@@ -1,0 +1,61 @@
+use anyhow::Result;
+use aws_config::BehaviorVersion;
+
+mod s3;
+mod ec2;
+mod iam;
+mod cloudwatch;
+
+pub use s3::{S3Service, S3NavigationAction, S3Item};
+pub use ec2::Ec2Service;
+pub use iam::IamService;
+pub use cloudwatch::CloudwatchService;
+
+#[derive(Clone)]
+pub struct AwsClient {
+    ec2_service: Ec2Service,
+    s3_service: S3Service,
+    iam_service: IamService,
+    cloudwatch_service: CloudwatchService,
+}
+
+impl AwsClient {
+    pub async fn new() -> Result<Self> {
+        let config = aws_config::load_defaults(BehaviorVersion::latest()).await;
+
+        Ok(Self {
+            ec2_service: Ec2Service::new(aws_sdk_ec2::Client::new(&config)),
+            s3_service: S3Service::new(aws_sdk_s3::Client::new(&config)),
+            iam_service: IamService::new(aws_sdk_iam::Client::new(&config)),
+            cloudwatch_service: CloudwatchService::new(aws_sdk_cloudwatch::Client::new(&config)),
+        })
+    }
+
+    pub async fn list_ec2_instances(&self) -> Result<Vec<String>> {
+        self.ec2_service.list_instances().await
+    }
+
+    pub async fn list_s3_buckets(&self) -> Result<Vec<(String, String)>> {
+        self.s3_service.list_buckets().await
+    }
+
+    pub async fn list_iam_users(&self) -> Result<Vec<String>> {
+        self.iam_service.list_users().await
+    }
+
+    pub async fn list_cloudwatch_alarms(&self) -> Result<Vec<String>> {
+        self.cloudwatch_service.list_alarms().await
+    }
+
+    pub async fn get_s3_bucket_details(&self, bucket_name: &str) -> Result<Vec<(String, String)>> {
+        self.s3_service.get_bucket_details(bucket_name).await
+    }
+
+    pub async fn list_s3_objects(
+        &self,
+        bucket: &str,
+        prefix: &str,
+    ) -> Result<Vec<(String, String, String)>> {
+        self.s3_service.list_objects(bucket, prefix).await
+    }
+}
