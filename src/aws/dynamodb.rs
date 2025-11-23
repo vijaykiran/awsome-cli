@@ -9,7 +9,6 @@ pub struct DynamoDbService {
 
 #[derive(Clone, Debug)]
 pub enum DynamoDbItem {
-    
     Header,
     Separator,
     Table(String),

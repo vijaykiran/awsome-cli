@@ -24,7 +24,7 @@ impl EcsService {
     pub async fn list_clusters(&self) -> Result<Vec<String>> {
         let resp = self.client.list_clusters().send().await?;
         let clusters = resp.cluster_arns();
-        
+
         let mut cluster_names = Vec::new();
         for arn in clusters {
             // Extract cluster name from ARN
@@ -32,42 +32,46 @@ impl EcsService {
             let name = arn.split('/').next_back().unwrap_or(arn).to_string();
             cluster_names.push(name);
         }
-        
+
         Ok(cluster_names)
     }
 
     pub async fn list_services(&self, cluster: &str) -> Result<Vec<String>> {
         let resp = self.client.list_services().cluster(cluster).send().await?;
         let services = resp.service_arns();
-        
+
         let mut service_names = Vec::new();
         for arn in services {
             let name = arn.split('/').next_back().unwrap_or(arn).to_string();
             service_names.push(name);
         }
-        
+
         Ok(service_names)
     }
 
     pub async fn list_tasks(&self, cluster: &str) -> Result<Vec<String>> {
         let resp = self.client.list_tasks().cluster(cluster).send().await?;
         let tasks = resp.task_arns();
-        
+
         let mut task_names = Vec::new();
         for arn in tasks {
             let name = arn.split('/').next_back().unwrap_or(arn).to_string();
             task_names.push(name);
         }
-        
+
         Ok(task_names)
     }
 
     pub fn format_cluster_list(clusters: &[String]) -> (Vec<String>, Vec<EcsItem>) {
         if clusters.is_empty() {
-            return (vec!["No ECS Clusters found".to_string()], vec![EcsItem::Header]);
+            return (
+                vec!["No ECS Clusters found".to_string()],
+                vec![EcsItem::Header],
+            );
         }
 
-        let max_name_len = clusters.iter()
+        let max_name_len = clusters
+            .iter()
             .map(|name| name.len())
             .max()
             .unwrap_or(20)
@@ -94,7 +98,8 @@ impl EcsService {
             return (items, ecs_items);
         }
 
-        let max_name_len = services.iter()
+        let max_name_len = services
+            .iter()
             .map(|name| name.len())
             .max()
             .unwrap_or(20)
@@ -125,11 +130,11 @@ mod tests {
     fn test_format_cluster_list() {
         let clusters = vec!["cluster1".to_string(), "cluster2".to_string()];
         let (items, ecs_items) = EcsService::format_cluster_list(&clusters);
-        
+
         assert_eq!(items.len(), 4); // Header, Separator, 2 clusters
         assert!(items[0].contains("Cluster Name"));
         assert!(items[2].contains("cluster1"));
-        
+
         assert!(matches!(ecs_items[2], EcsItem::Cluster(_)));
     }
 }

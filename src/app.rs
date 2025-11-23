@@ -1,6 +1,6 @@
 use crate::aws::{
-    AwsClient, DynamoDbItem, Ec2Item, Ec2Service, EcsItem, EcsService, IamItem, IamService, S3Item, S3NavigationAction,
-    S3Service,
+    AwsClient, DynamoDbItem, Ec2Item, Ec2Service, EcsItem, EcsService, IamItem, IamService, S3Item,
+    S3NavigationAction, S3Service,
 };
 use anyhow::Result;
 
@@ -742,7 +742,8 @@ impl App {
                     match client.list_ecs_services(cluster).await {
                         Ok(services) => {
                             self.loading_state = LoadingState::Loaded;
-                            let (items, ecs_items) = EcsService::format_service_list(&services, cluster);
+                            let (items, ecs_items) =
+                                EcsService::format_service_list(&services, cluster);
                             self.items = items;
                             self.ecs_items = ecs_items;
                             self.status_message = format!("Browsing cluster {}", cluster);
@@ -758,9 +759,12 @@ impl App {
                             let (items, ecs_items) = EcsService::format_cluster_list(&clusters);
                             self.items = items;
                             self.ecs_items = ecs_items;
-                            
+
                             if clusters.is_empty() {
-                                self.status_message = format!("No resources found for {}", self.get_active_service().as_str());
+                                self.status_message = format!(
+                                    "No resources found for {}",
+                                    self.get_active_service().as_str()
+                                );
                                 self.selected_index = 0;
                             } else {
                                 self.status_message = format!("Loaded {} clusters", clusters.len());

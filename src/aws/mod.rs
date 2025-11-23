@@ -12,9 +12,9 @@ pub mod utils;
 pub use cloudwatch::CloudwatchService;
 pub use dynamodb::{DynamoDbItem, DynamoDbService};
 pub use ec2::{Ec2Item, Ec2Service};
+pub use ecs::{EcsItem, EcsService};
 pub use iam::{IamItem, IamService};
 pub use s3::{S3Item, S3NavigationAction, S3Service};
-pub use ecs::{EcsService, EcsItem};
 
 #[derive(Clone)]
 pub struct AwsClient {
