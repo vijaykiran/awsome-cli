@@ -29,7 +29,7 @@ impl EcsService {
         for arn in clusters {
             // Extract cluster name from ARN
             // ARN format: arn:aws:ecs:region:account-id:cluster/cluster-name
-            let name = arn.split('/').last().unwrap_or(arn).to_string();
+            let name = arn.split('/').next_back().unwrap_or(arn).to_string();
             cluster_names.push(name);
         }
         
@@ -42,7 +42,7 @@ impl EcsService {
         
         let mut service_names = Vec::new();
         for arn in services {
-            let name = arn.split('/').last().unwrap_or(arn).to_string();
+            let name = arn.split('/').next_back().unwrap_or(arn).to_string();
             service_names.push(name);
         }
         
@@ -55,7 +55,7 @@ impl EcsService {
         
         let mut task_names = Vec::new();
         for arn in tasks {
-            let name = arn.split('/').last().unwrap_or(arn).to_string();
+            let name = arn.split('/').next_back().unwrap_or(arn).to_string();
             task_names.push(name);
         }
         
@@ -74,7 +74,7 @@ impl EcsService {
             .max(20);
 
         let header = format!("{:<width$}", "Cluster Name", width = max_name_len);
-        let separator = format!("{}", "-".repeat(max_name_len + 5));
+        let separator = "-".repeat(max_name_len + 5).to_string();
 
         let mut items = vec![header, separator];
         let mut ecs_items = vec![EcsItem::Header, EcsItem::Separator];
@@ -101,7 +101,7 @@ impl EcsService {
             .max(20);
 
         let header = format!("{:<width$}", "Service Name", width = max_name_len);
-        let separator = format!("{}", "-".repeat(max_name_len + 5));
+        let separator = "-".repeat(max_name_len + 5).to_string();
 
         let mut items = vec![header, separator];
         let mut ecs_items = vec![EcsItem::Header, EcsItem::Separator];
