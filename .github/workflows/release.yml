@@ -12,31 +12,8 @@ permissions:
   contents: write
 
 jobs:
-  create-release:
-    name: Create Release
-    runs-on: ubuntu-latest
-    outputs:
-      upload_url: ${{ steps.create_release.outputs.upload_url }}
-      version: ${{ steps.get_version.outputs.version }}
-    steps:
-      - name: Get version from tag
-        id: get_version
-        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
-
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          draft: false
-          prerelease: false
-
-  build-macos:
-    name: Build macOS
-    needs: create-release
+  build-and-release:
+    name: Build and Release
     strategy:
       matrix:
         include:
@@ -49,6 +26,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -60,35 +41,28 @@ jobs:
       - name: Create archive
         run: |
           cd target/${{ matrix.target }}/release
-          tar czf awsome-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz awsome
-          shasum -a 256 awsome-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz > awsome-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
+          tar czf awsome-${{ steps.get_version.outputs.version }}-${{ matrix.target }}.tar.gz awsome
+          shasum -a 256 awsome-${{ steps.get_version.outputs.version }}-${{ matrix.target }}.tar.gz > awsome-${{ steps.get_version.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
 
-      - name: Upload Release Asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Upload Release Assets
+        uses: softprops/action-gh-release@v2
         with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/${{ matrix.target }}/release/awsome-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz
-          asset_name: awsome-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz
-          asset_content_type: application/gzip
-
-      - name: Upload SHA256
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ needs.create-release.outputs.upload_url }}
-          asset_path: ./target/${{ matrix.target }}/release/awsome-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
-          asset_name: awsome-${{ needs.create-release.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
-          asset_content_type: text/plain
+          files: |
+            target/${{ matrix.target }}/release/awsome-${{ steps.get_version.outputs.version }}-${{ matrix.target }}.tar.gz
+            target/${{ matrix.target }}/release/awsome-${{ steps.get_version.outputs.version }}-${{ matrix.target }}.tar.gz.sha256
+          draft: false
+          prerelease: false
 
   update-homebrew:
     name: Update Homebrew Formula
-    needs: [create-release, build-macos]
+    needs: build-and-release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout taps repository
+      - name: Get version from tag
+        id: get_version
+        run: echo "version=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+
+      - name: Checkout tap repository
         uses: actions/checkout@v4
         with:
           repository: vijaykiran/homebrew-taps
@@ -97,7 +71,7 @@ jobs:
 
       - name: Download release assets
         run: |
-          VERSION=${{ needs.create-release.outputs.version }}
+          VERSION=${{ steps.get_version.outputs.version }}
           curl -L -o x86_64.tar.gz https://github.com/${{ github.repository }}/releases/download/v${VERSION}/awsome-${VERSION}-x86_64-apple-darwin.tar.gz
           curl -L -o aarch64.tar.gz https://github.com/${{ github.repository }}/releases/download/v${VERSION}/awsome-${VERSION}-aarch64-apple-darwin.tar.gz
           SHA256_X86=$(shasum -a 256 x86_64.tar.gz | cut -d ' ' -f 1)
@@ -107,7 +81,7 @@ jobs:
 
       - name: Update Homebrew formula
         run: |
-          VERSION=${{ needs.create-release.outputs.version }}
+          VERSION=${{ steps.get_version.outputs.version }}
           cat > awsome/Formula/awsome.rb << EOF
           class Awsome < Formula
             desc "AWSome AWS TUI"
@@ -139,5 +113,5 @@ jobs:
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
           git add Formula/awsome.rb
-          git commit -m "Update awsome to v${{ needs.create-release.outputs.version }}"
+          git commit -m "Update awsome to v${{ steps.get_version.outputs.version }}"
           git push
