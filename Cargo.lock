@@ -258,6 +258,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-mwaa"
+version = "1.96.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e86a27960d10af8f5c6cd7e2ce1a1855d22ee01e55b0f3b8366bda07834b9064"
+dependencies = [
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 0.2.12",
+ "regex-lite",
+ "tracing",
+]
+
+[[package]]
 name = "aws-sdk-s3"
 version = "1.115.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -664,6 +686,7 @@ dependencies = [
  "aws-sdk-ec2",
  "aws-sdk-ecs",
  "aws-sdk-iam",
+ "aws-sdk-mwaa",
  "aws-sdk-s3",
  "aws-smithy-mocks",
  "aws-smithy-types",

@@ -1,6 +1,6 @@
 use crate::aws::{
-    AwsClient, DynamoDbItem, Ec2Item, Ec2Service, EcsItem, EcsService, IamItem, IamService, S3Item,
-    S3NavigationAction, S3Service,
+    AwsClient, DynamoDbItem, Ec2Item, Ec2Service, EcsItem, EcsService, IamItem, IamService,
+    MwaaItem, MwaaService, S3Item, S3NavigationAction, S3Service,
 };
 use anyhow::Result;
 
@@ -12,6 +12,7 @@ pub enum ServiceType {
     CloudWatch,
     DynamoDB,
     ECS,
+    MWAA,
 }
 
 impl ServiceType {
@@ -23,6 +24,7 @@ impl ServiceType {
             ServiceType::CloudWatch => "CloudWatch Alarms",
             ServiceType::DynamoDB => "DynamoDB Tables",
             ServiceType::ECS => "ECS Clusters",
+            ServiceType::MWAA => "MWAA Environments",
         }
     }
 
@@ -34,6 +36,7 @@ impl ServiceType {
             ServiceType::CloudWatch => "CloudWatch",
             ServiceType::DynamoDB => "DynamoDB",
             ServiceType::ECS => "ECS",
+            ServiceType::MWAA => "MWAA",
         }
     }
 }
@@ -93,6 +96,7 @@ pub struct App {
     pub dynamodb_items: Vec<DynamoDbItem>,
     pub ec2_items: Vec<Ec2Item>,
     pub ecs_items: Vec<EcsItem>,
+    pub mwaa_items: Vec<MwaaItem>,
 }
 
 impl Default for App {
@@ -114,6 +118,7 @@ impl App {
                 ServiceInfo::new(ServiceType::CloudWatch, false),
                 ServiceInfo::new(ServiceType::DynamoDB, false),
                 ServiceInfo::new(ServiceType::ECS, false),
+                ServiceInfo::new(ServiceType::MWAA, false),
             ],
             active_service: 0,
             selected_index: 0,
@@ -137,6 +142,7 @@ impl App {
             dynamodb_items: Vec::new(),
             ec2_items: Vec::new(),
             ecs_items: Vec::new(),
+            mwaa_items: Vec::new(),
         }
     }
 
@@ -239,6 +245,14 @@ impl App {
             ServiceType::ECS => {
                 if index < self.ecs_items.len() {
                     return !matches!(self.ecs_items[index], EcsItem::Header | EcsItem::Separator);
+                }
+            }
+            ServiceType::MWAA => {
+                if index < self.mwaa_items.len() {
+                    return !matches!(
+                        self.mwaa_items[index],
+                        MwaaItem::Header | MwaaItem::Separator
+                    );
                 }
             }
             _ => {}
@@ -561,6 +575,21 @@ impl App {
                 // For now just show name
                 Ok(vec![("Name".to_string(), resource_name.clone())])
             }
+            ServiceType::MWAA => {
+                // Extract environment name from MwaaItem
+                if self.selected_index < self.mwaa_items.len() {
+                    if let MwaaItem::Environment(name) = &self.mwaa_items[self.selected_index] {
+                        match client.get_mwaa_environment(name).await {
+                            Ok(env) => Ok(MwaaService::get_environment_details_pairs(&env)),
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        Ok(vec![("Name".to_string(), resource_name.clone())])
+                    }
+                } else {
+                    Ok(vec![("Name".to_string(), resource_name.clone())])
+                }
+            }
         };
 
         match result {
@@ -779,11 +808,8 @@ impl App {
                         match client.list_ecs_tasks(cluster, Some(service)).await {
                             Ok(tasks) => {
                                 self.loading_state = LoadingState::Loaded;
-                                let (items, ecs_items) = EcsService::format_task_list(
-                                    &tasks,
-                                    cluster,
-                                    Some(service),
-                                );
+                                let (items, ecs_items) =
+                                    EcsService::format_task_list(&tasks, cluster, Some(service));
                                 self.items = items;
                                 self.ecs_items = ecs_items;
                                 self.status_message =
@@ -819,6 +845,28 @@ impl App {
                     }
                 }
             }
+            ServiceType::MWAA => match client.list_mwaa_environments().await {
+                Ok(envs) => {
+                    self.loading_state = LoadingState::Loaded;
+                    let (items, mwaa_items) = MwaaService::format_environment_list(&envs);
+                    self.items = items;
+                    self.mwaa_items = mwaa_items;
+
+                    if envs.is_empty() {
+                        self.status_message = format!(
+                            "No resources found for {}",
+                            self.get_active_service().as_str()
+                        );
+                        self.selected_index = 0;
+                    } else {
+                        self.status_message = format!("Loaded {} environments", envs.len());
+                        self.selected_index = 2;
+                    }
+                    self.error_message = None;
+                    Ok(())
+                }
+                Err(e) => self.handle_resource_error(e),
+            },
         }
     }
 

@@ -188,6 +188,16 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
                         false
                     }
                 }
+                crate::app::ServiceType::MWAA => {
+                    if i < app.mwaa_items.len() {
+                        matches!(
+                            app.mwaa_items[i],
+                            crate::aws::MwaaItem::Header | crate::aws::MwaaItem::Separator
+                        )
+                    } else {
+                        false
+                    }
+                }
                 _ => false,
             };
 

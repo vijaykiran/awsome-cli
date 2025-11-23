@@ -16,6 +16,7 @@ aws-sdk-iam = "1.99.0"
 aws-sdk-cloudwatch = "1.98.0"
 aws-sdk-dynamodb = "1.100.0"
 aws-sdk-ecs = "1.107.0"
+aws-sdk-mwaa = "1.96.0"
 
 [dev-dependencies]
 aws-smithy-mocks = "0.2.1"

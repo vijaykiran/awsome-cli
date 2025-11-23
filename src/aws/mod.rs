@@ -6,6 +6,7 @@ mod dynamodb;
 mod ec2;
 mod ecs;
 mod iam;
+mod mwaa;
 mod s3;
 pub mod utils;
 
@@ -14,6 +15,7 @@ pub use dynamodb::{DynamoDbItem, DynamoDbService};
 pub use ec2::{Ec2Item, Ec2Service};
 pub use ecs::{EcsItem, EcsService};
 pub use iam::{IamItem, IamService};
+pub use mwaa::{MwaaItem, MwaaService};
 pub use s3::{S3Item, S3NavigationAction, S3Service};
 
 #[derive(Clone)]
@@ -24,6 +26,7 @@ pub struct AwsClient {
     cloudwatch_service: CloudwatchService,
     dynamodb_service: DynamoDbService,
     ecs_service: EcsService,
+    mwaa_service: MwaaService,
 }
 
 impl AwsClient {
@@ -37,6 +40,7 @@ impl AwsClient {
             cloudwatch_service: CloudwatchService::new(aws_sdk_cloudwatch::Client::new(&config)),
             dynamodb_service: DynamoDbService::new(aws_sdk_dynamodb::Client::new(&config)),
             ecs_service: EcsService::new(aws_sdk_ecs::Client::new(&config)),
+            mwaa_service: MwaaService::new(aws_sdk_mwaa::Client::new(&config)),
         })
     }
 
@@ -103,5 +107,16 @@ impl AwsClient {
         service: Option<&str>,
     ) -> Result<Vec<(String, String, String, String, String)>> {
         self.ecs_service.list_tasks(cluster, service).await
+    }
+
+    pub async fn list_mwaa_environments(&self) -> Result<Vec<String>> {
+        self.mwaa_service.list_environments().await
+    }
+
+    pub async fn get_mwaa_environment(
+        &self,
+        name: &str,
+    ) -> Result<aws_sdk_mwaa::types::Environment> {
+        self.mwaa_service.get_environment(name).await
     }
 }
