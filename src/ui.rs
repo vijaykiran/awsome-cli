@@ -147,6 +147,13 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
                         false
                     }
                 }
+                crate::app::ServiceType::EC2 => {
+                    if i < app.ec2_items.len() {
+                        matches!(app.ec2_items[i], crate::aws::Ec2Item::Header | crate::aws::Ec2Item::Separator)
+                    } else {
+                        false
+                    }
+                }
                 _ => false,
             };
 

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use crate::aws::{AwsClient, S3Service, S3NavigationAction, S3Item, IamService, IamItem, DynamoDbItem};
+use crate::aws::{AwsClient, S3Service, S3NavigationAction, S3Item, IamService, IamItem, DynamoDbItem, Ec2Item, Ec2Service};
 
 #[derive(Clone, Copy, PartialEq)]
 pub enum ServiceType {
@@ -85,6 +85,7 @@ pub struct App {
     pub s3_items: Vec<S3Item>,
     pub iam_items: Vec<IamItem>,
     pub dynamodb_items: Vec<DynamoDbItem>,
+    pub ec2_items: Vec<Ec2Item>,
 }
 
 impl App {
@@ -123,6 +124,7 @@ impl App {
             s3_items: Vec::new(),
             iam_items: Vec::new(),
             dynamodb_items: Vec::new(),
+            ec2_items: Vec::new(),
         }
     }
 
@@ -211,6 +213,11 @@ impl App {
             ServiceType::DynamoDB => {
                 if index < self.dynamodb_items.len() {
                     return !matches!(self.dynamodb_items[index], DynamoDbItem::Header | DynamoDbItem::Separator);
+                }
+            }
+            ServiceType::EC2 => {
+                if index < self.ec2_items.len() {
+                    return !matches!(self.ec2_items[index], Ec2Item::Header | Ec2Item::Separator);
                 }
             }
             _ => {}
@@ -457,8 +464,18 @@ impl App {
                 }
             },
             ServiceType::EC2 => {
-                // For now, just show a placeholder
-                Ok(vec![("Instance ID".to_string(), resource_name.clone())])
+                // Extract instance ID from Ec2Item
+                if self.selected_index < self.ec2_items.len() {
+                    if let Ec2Item::Instance(id) = &self.ec2_items[self.selected_index] {
+                        // For now, just show a placeholder or basic details we already have
+                        // In a real app, we might fetch more details here
+                        Ok(vec![("Instance ID".to_string(), id.clone())])
+                    } else {
+                         Ok(vec![("Instance ID".to_string(), resource_name.clone())])
+                    }
+                } else {
+                    Ok(vec![("Instance ID".to_string(), resource_name.clone())])
+                }
             }
             ServiceType::IAM => {
                 // If we have structured items, use them to get the name
@@ -515,16 +532,20 @@ impl App {
         match self.get_active_service().service_type {
             ServiceType::EC2 => {
                 match client.list_ec2_instances().await {
-                    Ok(resources) => {
+                    Ok(instances) => {
                         self.loading_state = LoadingState::Loaded;
-                        if resources.is_empty() {
-                            self.items = vec![format!("No {} found", self.get_active_service().as_str())];
+                        let (items, ec2_items) = Ec2Service::format_instance_list(&instances);
+                        self.items = items;
+                        self.ec2_items = ec2_items;
+
+                        if instances.is_empty() {
                             self.status_message = format!("No resources found for {}", self.get_active_service().as_str());
+                            self.selected_index = 0;
                         } else {
-                            self.items = resources;
-                            self.status_message = format!("Loaded {} resources ({})", self.items.len(), self.get_active_service().as_str());
+                            self.status_message = format!("Loaded {} resources ({})", instances.len(), self.get_active_service().as_str());
+                            // Set selection to first item (skip header and separator)
+                            self.selected_index = 2;
                         }
-                        self.selected_index = 0;
                         self.error_message = None;
                         Ok(())
                     }

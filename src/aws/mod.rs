@@ -8,7 +8,7 @@ mod cloudwatch;
 mod dynamodb;
 
 pub use s3::{S3Service, S3NavigationAction, S3Item};
-pub use ec2::Ec2Service;
+pub use ec2::{Ec2Service, Ec2Item};
 pub use iam::{IamService, IamItem};
 pub use cloudwatch::CloudwatchService;
 pub use dynamodb::{DynamoDbService, DynamoDbItem};
@@ -35,7 +35,7 @@ impl AwsClient {
         })
     }
 
-    pub async fn list_ec2_instances(&self) -> Result<Vec<String>> {
+    pub async fn list_ec2_instances(&self) -> Result<Vec<(String, String, String, String, String)>> {
         self.ec2_service.list_instances().await
     }
 
