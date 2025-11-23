@@ -113,6 +113,6 @@ jobs:
           cd homebrew-taps
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          git add Formula/awsome.rb
+          git add awsome/Formula/awsome.rb
           git commit -m "Update awsome to v${{ steps.get_version.outputs.version }}"
           git push
