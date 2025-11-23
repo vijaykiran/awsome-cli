@@ -96,4 +96,12 @@ impl AwsClient {
     pub async fn list_ecs_services(&self, cluster: &str) -> Result<Vec<String>> {
         self.ecs_service.list_services(cluster).await
     }
+
+    pub async fn list_ecs_tasks(
+        &self,
+        cluster: &str,
+        service: Option<&str>,
+    ) -> Result<Vec<(String, String, String, String, String)>> {
+        self.ecs_service.list_tasks(cluster, service).await
+    }
 }

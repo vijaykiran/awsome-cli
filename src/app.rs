@@ -306,10 +306,26 @@ impl App {
                             self.refresh_resources().await?;
                             return Ok(());
                         }
+                        EcsItem::Service(name) => {
+                            if let Some(cluster) = &self.current_path {
+                                self.current_path = Some(format!("{}/{}", cluster, name));
+                                self.refresh_resources().await?;
+                                return Ok(());
+                            }
+                        }
                         EcsItem::ParentDir => {
-                            self.current_path = None;
-                            self.refresh_resources().await?;
-                            return Ok(());
+                            if let Some(path) = &self.current_path {
+                                let parts: Vec<&str> = path.split('/').collect();
+                                if parts.len() > 1 {
+                                    // Go back to cluster view
+                                    self.current_path = Some(parts[0].to_string());
+                                } else {
+                                    // Go back to cluster list
+                                    self.current_path = None;
+                                }
+                                self.refresh_resources().await?;
+                                return Ok(());
+                            }
                         }
                         _ => {}
                     }
@@ -738,19 +754,45 @@ impl App {
                 }
             }
             ServiceType::ECS => {
-                if let Some(cluster) = &self.current_path {
-                    match client.list_ecs_services(cluster).await {
-                        Ok(services) => {
-                            self.loading_state = LoadingState::Loaded;
-                            let (items, ecs_items) =
-                                EcsService::format_service_list(&services, cluster);
-                            self.items = items;
-                            self.ecs_items = ecs_items;
-                            self.status_message = format!("Browsing cluster {}", cluster);
-                            self.selected_index = 2; // Skip header and separator
-                            Ok(())
+                if let Some(path) = &self.current_path {
+                    let parts: Vec<&str> = path.split('/').collect();
+                    if parts.len() == 1 {
+                        // List services in cluster
+                        let cluster = parts[0];
+                        match client.list_ecs_services(cluster).await {
+                            Ok(services) => {
+                                self.loading_state = LoadingState::Loaded;
+                                let (items, ecs_items) =
+                                    EcsService::format_service_list(&services, cluster);
+                                self.items = items;
+                                self.ecs_items = ecs_items;
+                                self.status_message = format!("Browsing cluster {}", cluster);
+                                self.selected_index = 2; // Skip header and separator
+                                Ok(())
+                            }
+                            Err(e) => self.handle_resource_error(e),
                         }
-                        Err(e) => self.handle_resource_error(e),
+                    } else {
+                        // List tasks in service
+                        let cluster = parts[0];
+                        let service = parts[1];
+                        match client.list_ecs_tasks(cluster, Some(service)).await {
+                            Ok(tasks) => {
+                                self.loading_state = LoadingState::Loaded;
+                                let (items, ecs_items) = EcsService::format_task_list(
+                                    &tasks,
+                                    cluster,
+                                    Some(service),
+                                );
+                                self.items = items;
+                                self.ecs_items = ecs_items;
+                                self.status_message =
+                                    format!("Browsing tasks in {}/{}", cluster, service);
+                                self.selected_index = 2; // Skip header and separator
+                                Ok(())
+                            }
+                            Err(e) => self.handle_resource_error(e),
+                        }
                     }
                 } else {
                     match client.list_ecs_clusters().await {
