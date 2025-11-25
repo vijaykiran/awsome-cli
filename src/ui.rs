@@ -198,6 +198,16 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &App) {
                         false
                     }
                 }
+                crate::app::ServiceType::Lambda => {
+                    if i < app.lambda_items.len() {
+                        matches!(
+                            app.lambda_items[i],
+                            crate::aws::LambdaItem::Header | crate::aws::LambdaItem::Separator
+                        )
+                    } else {
+                        false
+                    }
+                }
                 _ => false,
             };
 

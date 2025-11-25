@@ -6,6 +6,7 @@ mod dynamodb;
 mod ec2;
 mod ecs;
 mod iam;
+mod lambda;
 mod mwaa;
 mod s3;
 pub mod utils;
@@ -15,6 +16,7 @@ pub use dynamodb::{DynamoDbItem, DynamoDbService};
 pub use ec2::{Ec2Item, Ec2Service};
 pub use ecs::{EcsItem, EcsService};
 pub use iam::{IamItem, IamService};
+pub use lambda::{LambdaItem, LambdaService};
 pub use mwaa::{MwaaItem, MwaaService};
 pub use s3::{S3Item, S3NavigationAction, S3Service};
 
@@ -27,6 +29,7 @@ pub struct AwsClient {
     dynamodb_service: DynamoDbService,
     ecs_service: EcsService,
     mwaa_service: MwaaService,
+    lambda_service: LambdaService,
 }
 
 impl AwsClient {
@@ -41,6 +44,7 @@ impl AwsClient {
             dynamodb_service: DynamoDbService::new(aws_sdk_dynamodb::Client::new(&config)),
             ecs_service: EcsService::new(aws_sdk_ecs::Client::new(&config)),
             mwaa_service: MwaaService::new(aws_sdk_mwaa::Client::new(&config)),
+            lambda_service: LambdaService::new(aws_sdk_lambda::Client::new(&config)),
         })
     }
 
@@ -118,5 +122,16 @@ impl AwsClient {
         name: &str,
     ) -> Result<aws_sdk_mwaa::types::Environment> {
         self.mwaa_service.get_environment(name).await
+    }
+
+    pub async fn list_lambda_functions(&self) -> Result<Vec<(String, String, String)>> {
+        self.lambda_service.list_functions().await
+    }
+
+    pub async fn get_lambda_function(
+        &self,
+        name: &str,
+    ) -> Result<aws_sdk_lambda::types::FunctionConfiguration> {
+        self.lambda_service.get_function(name).await
     }
 }

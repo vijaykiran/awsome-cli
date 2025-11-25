@@ -1,6 +1,6 @@
 use crate::aws::{
     AwsClient, DynamoDbItem, Ec2Item, Ec2Service, EcsItem, EcsService, IamItem, IamService,
-    MwaaItem, MwaaService, S3Item, S3NavigationAction, S3Service,
+    LambdaItem, LambdaService, MwaaItem, MwaaService, S3Item, S3NavigationAction, S3Service,
 };
 use anyhow::Result;
 
@@ -13,6 +13,7 @@ pub enum ServiceType {
     DynamoDB,
     ECS,
     MWAA,
+    Lambda,
 }
 
 impl ServiceType {
@@ -25,6 +26,7 @@ impl ServiceType {
             ServiceType::DynamoDB => "DynamoDB Tables",
             ServiceType::ECS => "ECS Clusters",
             ServiceType::MWAA => "MWAA Environments",
+            ServiceType::Lambda => "Lambda Functions",
         }
     }
 
@@ -37,6 +39,7 @@ impl ServiceType {
             ServiceType::DynamoDB => "DynamoDB",
             ServiceType::ECS => "ECS",
             ServiceType::MWAA => "MWAA",
+            ServiceType::Lambda => "Lambda",
         }
     }
 }
@@ -97,6 +100,7 @@ pub struct App {
     pub ec2_items: Vec<Ec2Item>,
     pub ecs_items: Vec<EcsItem>,
     pub mwaa_items: Vec<MwaaItem>,
+    pub lambda_items: Vec<LambdaItem>,
 }
 
 impl Default for App {
@@ -119,6 +123,7 @@ impl App {
                 ServiceInfo::new(ServiceType::DynamoDB, false),
                 ServiceInfo::new(ServiceType::ECS, false),
                 ServiceInfo::new(ServiceType::MWAA, false),
+                ServiceInfo::new(ServiceType::Lambda, false),
             ],
             active_service: 0,
             selected_index: 0,
@@ -143,6 +148,7 @@ impl App {
             ec2_items: Vec::new(),
             ecs_items: Vec::new(),
             mwaa_items: Vec::new(),
+            lambda_items: Vec::new(),
         }
     }
 
@@ -252,6 +258,14 @@ impl App {
                     return !matches!(
                         self.mwaa_items[index],
                         MwaaItem::Header | MwaaItem::Separator
+                    );
+                }
+            }
+            ServiceType::Lambda => {
+                if index < self.lambda_items.len() {
+                    return !matches!(
+                        self.lambda_items[index],
+                        LambdaItem::Header | LambdaItem::Separator
                     );
                 }
             }
@@ -590,6 +604,21 @@ impl App {
                     Ok(vec![("Name".to_string(), resource_name.clone())])
                 }
             }
+            ServiceType::Lambda => {
+                // Extract function name from LambdaItem
+                if self.selected_index < self.lambda_items.len() {
+                    if let LambdaItem::Function(name) = &self.lambda_items[self.selected_index] {
+                        match client.get_lambda_function(name).await {
+                            Ok(config) => Ok(LambdaService::get_function_details_pairs(&config)),
+                            Err(e) => Err(e),
+                        }
+                    } else {
+                        Ok(vec![("Name".to_string(), resource_name.clone())])
+                    }
+                } else {
+                    Ok(vec![("Name".to_string(), resource_name.clone())])
+                }
+            }
         };
 
         match result {
@@ -867,6 +896,35 @@ impl App {
                 }
                 Err(e) => self.handle_resource_error(e),
             },
+            ServiceType::Lambda => {
+                match client.list_lambda_functions().await {
+                    Ok(functions) => {
+                        self.loading_state = LoadingState::Loaded;
+                        let (items, lambda_items) = LambdaService::format_function_list(&functions);
+                        self.items = items;
+                        self.lambda_items = lambda_items;
+
+                        if functions.is_empty() {
+                            self.status_message = format!(
+                                "No resources found for {}",
+                                self.get_active_service().as_str()
+                            );
+                            self.selected_index = 0;
+                        } else {
+                            self.status_message = format!(
+                                "Loaded {} resources ({})",
+                                functions.len(),
+                                self.get_active_service().as_str()
+                            );
+                            // Set selection to first item (skip header and separator)
+                            self.selected_index = 2;
+                        }
+                        self.error_message = None;
+                        Ok(())
+                    }
+                    Err(e) => self.handle_resource_error(e),
+                }
+            }
         }
     }
 

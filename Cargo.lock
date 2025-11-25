@@ -257,6 +257,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "aws-sdk-lambda"
+version = "1.107.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81b18761f215ee7bfeb834687c0b3894f2ea3a990f3b80273fe63ce28bd08267"
+dependencies = [
+ "aws-credential-types",
+ "aws-runtime",
+ "aws-smithy-async",
+ "aws-smithy-eventstream",
+ "aws-smithy-http",
+ "aws-smithy-json",
+ "aws-smithy-runtime",
+ "aws-smithy-runtime-api",
+ "aws-smithy-types",
+ "aws-types",
+ "bytes",
+ "fastrand",
+ "http 0.2.12",
+ "regex-lite",
+ "tracing",
+]
+
+[[package]]
 name = "aws-sdk-mwaa"
 version = "1.96.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -685,6 +708,7 @@ dependencies = [
  "aws-sdk-ec2",
  "aws-sdk-ecs",
  "aws-sdk-iam",
+ "aws-sdk-lambda",
  "aws-sdk-mwaa",
  "aws-sdk-s3",
  "aws-smithy-mocks",
